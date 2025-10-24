@@ -6,8 +6,13 @@ import { openModal, closeModal, showCustomConfirm, openCompanyModal, closeCompan
 import { saveStateToLocalStorage } from './services/storageService.js';
 
 function renderAndSave() {
-    renderAll();
-    saveStateToLocalStorage(State.state);
+    try {
+        renderAll();
+        saveStateToLocalStorage(State.state);
+    } catch (error) {
+        console.error("A critical error occurred during the render and save process:", error);
+        alert("An error occurred. Please check the console for more details.");
+    }
 }
 
 function handlePlaceOrder() {
@@ -169,6 +174,7 @@ export function initializeEventListeners() {
         } else {
             State.selectSupplier(id);
             renderAll();
+            document.getElementById('product-search').focus(); // Auto-focus product search
         }
     });
 
@@ -213,7 +219,8 @@ export function initializeEventListeners() {
             const orderId = Number(reprintBtn.dataset.id);
             const orderToReprint = State.state.orderHistory.find(o => o.id === orderId);
             if (orderToReprint) {
-                generatePdfFromHistory(orderToReprint, State.state.products, State.state.suppliers);
+                // Pass all required state arrays to the function
+                generatePdfFromHistory(orderToReprint, State.state.products, State.state.suppliers, State.state.companies);
             }
         }
 

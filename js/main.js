@@ -5,6 +5,7 @@ import { initializeEventListeners } from './listeners.js';
 import { loadStateFromLocalStorage } from './services/storageService.js';
 import { generatePdf } from './services/pdfService.js';
 import { initializeImportExportEventListeners } from './services/importExportService.js';
+import './loader.js'; // Import for side effects
 
 function initializeApp() {
     console.log("1. App Initializing...");

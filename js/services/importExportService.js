@@ -1,6 +1,7 @@
 // js/services/importExportService.js
 
 import { showInfoAlert, showVerificationModal } from '../modal.js';
+import { showLoader, hideLoader } from '../loader.js';
 
 /**
  * --- DEFINITIVE FIX V8 ---
@@ -83,26 +84,33 @@ function handleFileImport(file, state) {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-        try {
-            const data = e.target.result;
-            const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
-            
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        showLoader(); // Show loader when processing starts
+        // Use a timeout to allow the UI to update before the heavy processing begins
+        setTimeout(() => {
+            try {
+                const data = e.target.result;
+                const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+                
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-            const validationError = preImportValidation(jsonData);
-            if (validationError) {
-                showInfoAlert("Import Failed", validationError);
-                return;
+                const validationError = preImportValidation(jsonData);
+                if (validationError) {
+                    showInfoAlert("Import Failed", validationError);
+                    hideLoader(); // Hide loader on error
+                    return;
+                }
+                
+                processImportedData(jsonData, state);
+
+            } catch (error) {
+                console.error("Error processing file:", error);
+                showInfoAlert("Import Error", "There was an error processing your file.");
+            } finally {
+                hideLoader(); // Always hide loader when done
             }
-            
-            processImportedData(jsonData, state);
-
-        } catch (error) {
-            console.error("Error processing file:", error);
-            showInfoAlert("Import Error", "There was an error processing your file.");
-        }
+        }, 50); // 50ms delay
     };
     reader.readAsArrayBuffer(file);
 }
