@@ -13,15 +13,36 @@ export function generatePdf(state) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const supplier = state.suppliers.find(s => s.id === state.selectedSupplierId);
+    // --- NEW: Get current company details ---
+    const currentCompany = state.companies.find(c => c.id === state.selectedCompanyId);
     const { orderNumber, orderDate, paymentMethod, isPaid } = state.orderDetails;
     let netTotal = 0;
     let y = 20;
 
+    // --- NEW: Add Company Header ---
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text(currentCompany.name || "Purchase Order", 14, y);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    if (currentCompany.address) {
+        y += 6;
+        doc.text(currentCompany.address, 14, y);
+    }
+    if (currentCompany.email || currentCompany.phone) {
+        y += 5;
+        doc.text(`${currentCompany.email || ''} | ${currentCompany.phone || ''}`, 14, y);
+    }
+    if (currentCompany.website) {
+        y += 5;
+        doc.text(currentCompany.website, 14, y);
+    }
+    y += 10;
+    
     doc.setFontSize(18);
     doc.text("Purchase Order", 105, y, { align: "center" });
     y += 15;
     
-    // --- Supplier Details Section ---
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
     doc.text("Supplier Details:", 14, y);
@@ -42,7 +63,6 @@ export function generatePdf(state) {
     }
     y += 5;
 
-    // --- Order Details Section ---
     doc.text(`Order #: ${orderNumber || ''}`, 14, y);
     doc.text(`Date: ${new Date(orderDate).toLocaleDateString()}`, 140, y);
     y += 7;
@@ -50,61 +70,49 @@ export function generatePdf(state) {
     
     doc.setFont(undefined, 'bold');
     doc.text(`Status:`, 140, y);
-    if (isPaid) doc.setTextColor(0, 150, 0);
-    else doc.setTextColor(255, 0, 0);
+    doc.setTextColor(isPaid ? '#34c759' : '#ff3b30');
     doc.text(isPaid ? 'PAID' : 'UNPAID', 158, y);
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, 'normal');
     y += 15;
 
-    // --- START: Corrected Table Header ---
     doc.setFont(undefined, 'bold');
     doc.text("Item Title", 14, y);
     doc.text("Supplier Code", 75, y);
     doc.text("Amazon Code", 110, y);
     doc.text("Qty", 145, y);
-    doc.text("Unit Price", 175, y, { align: 'right' }); // FIX: Pushed further right
+    doc.text("Unit Price", 175, y, { align: 'right' });
     doc.text("Net Total", 196, y, { align: 'right' });
     y += 5;
     doc.line(14, y, 196, y);
     y += 4;
     doc.setFont(undefined, 'normal');
-    // --- END: Corrected Table Header ---
 
-    // --- START: Corrected Table Rows ---
     state.cart.forEach(item => {
         const product = state.products.find(p => p.id === item.productId);
         if (!product) return;
 
         const itemTotal = product.price * item.quantity;
         netTotal += itemTotal;
-        
         const startY = y;
-
         const titleLines = doc.splitTextToSize(product.title || '', 60);
         doc.text(titleLines, 14, y);
         let maxLines = titleLines.length;
-
         const supCodeLines = doc.splitTextToSize(product.code || '', 35);
         doc.text(supCodeLines, 75, y);
         maxLines = Math.max(maxLines, supCodeLines.length);
-        
         const amzCodeLines = doc.splitTextToSize(product.amazonCode || '', 35);
         doc.text(amzCodeLines, 110, y);
         maxLines = Math.max(maxLines, amzCodeLines.length);
-
         doc.text(item.quantity.toString(), 147, y, { align: 'center' });
-        doc.text(`$${product.price.toFixed(2)}`, 175, y, { align: 'right' }); // FIX: Pushed further right
+        doc.text(`$${product.price.toFixed(2)}`, 175, y, { align: 'right' });
         doc.text(`$${itemTotal.toFixed(2)}`, 196, y, { align: 'right' });
-        
         y = startY + (maxLines * 7) + 3; 
     });
-    // --- END: Corrected Table Rows ---
 
     doc.line(14, y, 196, y);
     y += 7;
 
-    // --- Totals Section ---
     doc.setFont(undefined, 'bold');
     doc.text(`Net Total:`, 140, y);
     doc.text(`$${netTotal.toFixed(2)}`, 196, y, { align: 'right' });
@@ -115,7 +123,6 @@ export function generatePdf(state) {
         doc.text(`VAT (20%):`, 140, y);
         doc.text(`$${vatAmount.toFixed(2)}`, 196, y, { align: 'right' });
         y += 7;
-        
         doc.setFontSize(14);
         const grandTotal = netTotal + vatAmount;
         doc.text(`Grand Total:`, 140, y);
@@ -125,9 +132,10 @@ export function generatePdf(state) {
     const fileName = `Order_${orderNumber || 'General'}_${Date.now()}.pdf`;
     doc.save(fileName);
 }
-// ADD THIS NEW FUNCTION to pdfService.js
 
 export function generatePdfFromHistory(order, allProducts, allSuppliers) {
+    // This function can be similarly updated if needed, but is omitted here for brevity
+    // as it would require passing the `companies` array to it.
     if (!order || order.items.length === 0) {
         alert("Cannot generate PDF. The selected order has no items.");
         return;
@@ -147,7 +155,6 @@ export function generatePdfFromHistory(order, allProducts, allSuppliers) {
     doc.text("Purchase Order (Reprint)", 105, y, { align: "center" });
     y += 15;
 
-    // Details are sourced from the 'order' object, not the global state
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
     doc.text("Supplier Details:", 14, y);
@@ -171,8 +178,7 @@ export function generatePdfFromHistory(order, allProducts, allSuppliers) {
     
     doc.setFont(undefined, 'bold');
     doc.text(`Status:`, 140, y);
-    if (order.isPaid) doc.setTextColor(0, 150, 0);
-    else doc.setTextColor(255, 0, 0);
+    doc.setTextColor(order.isPaid ? '#34c759' : '#ff3b30');
     doc.text(order.isPaid ? 'PAID' : 'UNPAID', 158, y);
     doc.setTextColor(0, 0, 0);
     doc.setFont(undefined, 'normal');
@@ -208,8 +214,6 @@ export function generatePdfFromHistory(order, allProducts, allSuppliers) {
     doc.line(14, y, 196, y);
     y += 7;
 
-    // Totals are calculated from the historical order items
-    // This example assumes VAT status at the time of reprint, not original order
     const vatAmount = (order.totalPrice - netTotal).toFixed(2);
     
     doc.setFont(undefined, 'bold');

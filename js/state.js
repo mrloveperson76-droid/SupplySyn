@@ -1,10 +1,12 @@
 // js/state.js
 export const state = {
+    companies: [{ id: 1, name: 'Default Company', address: '', email: '', phone: '', website: '' }],
+    selectedCompanyId: 1,
     suppliers: [],
     products: [],
     cart: [],
     orderHistory: [],
-    editingOrderId: null, // Track if we are editing a past order
+    editingOrderId: null,
     orderDetails: {
         orderNumber: '',
         orderDate: new Date().toISOString().slice(0, 10),
@@ -18,68 +20,89 @@ export const state = {
     vatEnabled: false
 };
 
+// --- UPDATED COMPANY FUNCTIONS ---
+export function addCompany(companyData) {
+    const newId = Date.now();
+    state.companies.push({ id: newId, ...companyData });
+    selectCompany(newId);
+}
+
+export function updateCompany(companyData) {
+    const index = state.companies.findIndex(c => c.id === companyData.id);
+    if (index > -1) {
+        state.companies[index] = { ...state.companies[index], ...companyData };
+    }
+}
+
+export function deleteCompany(companyId) {
+    if (state.companies.length === 1) {
+        alert("You cannot delete the only company.");
+        return;
+    }
+    // Reassign data to the first available company before deleting
+    const newCompanyId = state.companies.find(c => c.id !== companyId).id;
+    state.suppliers = state.suppliers.filter(s => s.companyId !== companyId);
+    state.products = state.products.filter(p => p.companyId !== companyId);
+    state.orderHistory = state.orderHistory.filter(o => o.companyId !== companyId);
+
+    state.companies = state.companies.filter(c => c.id !== companyId);
+
+    if (state.selectedCompanyId === companyId) {
+        selectCompany(newCompanyId);
+    }
+}
+
+
+export function selectCompany(companyId) {
+    state.selectedCompanyId = companyId;
+    state.selectedSupplierId = null;
+    state.cart = [];
+}
+
 /**
  * Applies the user-verified changes from the import process to the state.
  * @param {object} changes - An object containing arrays of new/updated suppliers and products.
  */
 export function applyImportChanges(changes) {
-    // 1. Add New Suppliers
     changes.newSuppliers.forEach(supData => {
-        if (!state.suppliers.some(s => s.name.toLowerCase() === supData.name.toLowerCase())) {
+        if (!state.suppliers.some(s => s.name.toLowerCase() === supData.name.toLowerCase() && s.companyId === state.selectedCompanyId)) {
             state.suppliers.push({
                 id: Date.now() + Math.random(),
-                name: supData.name,
-                email: supData.email,
-                phone: supData.phone,
-                address: supData.address,
+                companyId: state.selectedCompanyId, // UPDATED
+                name: supData.name, email: supData.email, phone: supData.phone, address: supData.address,
                 notes: '', photo: null
             });
         }
     });
 
-    // 2. Update Existing Suppliers
     changes.updatedSuppliers.forEach(supData => {
-        const supplier = state.suppliers.find(s => s.name.toLowerCase() === supData.name.toLowerCase());
+        const supplier = state.suppliers.find(s => s.name.toLowerCase() === supData.name.toLowerCase() && s.companyId === state.selectedCompanyId);
         if (supplier) {
-            supplier.email = supData.email;
-            supplier.phone = supData.phone;
-            supplier.address = supData.address;
+            Object.assign(supplier, { email: supData.email, phone: supData.phone, address: supData.address });
         }
     });
 
-    // 3. Add New Products
     changes.newProducts.forEach(prodData => {
-        const supplier = state.suppliers.find(s => s.name.toLowerCase() === prodData.supplierName.toLowerCase());
+        const supplier = state.suppliers.find(s => s.name.toLowerCase() === prodData.supplierName.toLowerCase() && s.companyId === state.selectedCompanyId);
         if (supplier) {
-            // --- FIX: Added a safety check for 'p.amazonCode' before calling toLowerCase ---
-            if (!state.products.some(p => p.amazonCode && p.amazonCode.toLowerCase() === prodData.amazonCode.toLowerCase() && p.supplierId === supplier.id)) {
+            if (!state.products.some(p => p.amazonCode?.toLowerCase() === prodData.amazonCode.toLowerCase() && p.supplierId === supplier.id)) {
                 state.products.push({
                     id: Date.now() + Math.random(),
                     supplierId: supplier.id,
-                    title: prodData.title,
-                    price: prodData.price,
-                    code: prodData.code,
-                    amazonCode: prodData.amazonCode,
+                    companyId: state.selectedCompanyId, // UPDATED
+                    title: prodData.title, price: prodData.price, code: prodData.code, amazonCode: prodData.amazonCode,
                     desc: '', photo: null
                 });
             }
         }
     });
 
-    // 4. Update Existing Products
     changes.updatedProducts.forEach(prodData => {
-        const supplier = state.suppliers.find(s => s.name.toLowerCase() === prodData.supplierName.toLowerCase());
+        const supplier = state.suppliers.find(s => s.name.toLowerCase() === prodData.supplierName.toLowerCase() && s.companyId === state.selectedCompanyId);
         if (supplier) {
-            // --- FIX: Added a safety check for 'p.amazonCode' before calling toLowerCase ---
-            const product = state.products.find(p =>
-                p.amazonCode && p.amazonCode.toLowerCase() === prodData.amazonCode.toLowerCase() &&
-                p.supplierId === supplier.id
-            );
-
+            const product = state.products.find(p => p.amazonCode?.toLowerCase() === prodData.amazonCode.toLowerCase() && p.supplierId === supplier.id);
             if (product) {
-                product.title = prodData.title;
-                product.price = prodData.price;
-                product.code = prodData.code;
+                Object.assign(product, { title: prodData.title, price: prodData.price, code: prodData.code });
             }
         }
     });
@@ -93,10 +116,12 @@ export function selectSupplier(id) {
 export function saveItem(itemData) {
     const list = state.editingItemType === 'supplier' ? state.suppliers : state.products;
     if (!state.editingItemId) {
+        itemData.companyId = state.selectedCompanyId; // UPDATED
         list.push(itemData);
     } else {
         const index = list.findIndex(i => i.id === state.editingItemId);
         if (index > -1) {
+            itemData.companyId = list[index].companyId;
             list[index] = itemData;
         }
     }
@@ -136,7 +161,7 @@ export function updateCartQuantity(productId, change) {
 
 export function clearCart() {
     state.cart = [];
-    state.editingOrderId = null; // Clear editing state
+    state.editingOrderId = null;
 }
 
 export function toggleVat(isEnabled) {
@@ -160,32 +185,24 @@ export function placeOrder() {
     const vatAmount = state.vatEnabled ? netTotal * 0.20 : 0;
     const grandTotal = netTotal + vatAmount;
 
+    const orderPayload = {
+        orderNumber: state.orderDetails.orderNumber,
+        orderDate: state.orderDetails.orderDate,
+        supplierId: state.selectedSupplierId,
+        supplierName: supplier ? supplier.name : 'N/A',
+        totalPrice: grandTotal,
+        isPaid: state.orderDetails.isPaid,
+        items: [...state.cart],
+        companyId: state.selectedCompanyId // UPDATED
+    };
+
     if (state.editingOrderId) {
         const orderIndex = state.orderHistory.findIndex(o => o.id === state.editingOrderId);
         if (orderIndex > -1) {
-            const updatedOrder = {
-                ...state.orderHistory[orderIndex],
-                orderNumber: state.orderDetails.orderNumber,
-                orderDate: state.orderDetails.orderDate,
-                supplierId: state.selectedSupplierId,
-                supplierName: supplier ? supplier.name : 'N/A',
-                totalPrice: grandTotal,
-                isPaid: state.orderDetails.isPaid,
-                items: [...state.cart]
-            };
-            state.orderHistory[orderIndex] = updatedOrder;
+            state.orderHistory[orderIndex] = { ...state.orderHistory[orderIndex], ...orderPayload };
         }
     } else {
-        const newOrder = {
-            id: Date.now(),
-            orderNumber: state.orderDetails.orderNumber || `PO-${Date.now()}`,
-            orderDate: state.orderDetails.orderDate,
-            supplierId: state.selectedSupplierId,
-            supplierName: supplier ? supplier.name : 'N/A',
-            totalPrice: grandTotal,
-            isPaid: state.orderDetails.isPaid,
-            items: [...state.cart]
-        };
+        const newOrder = { id: Date.now(), ...orderPayload };
         state.orderHistory.unshift(newOrder);
     }
 
@@ -197,6 +214,8 @@ export function placeOrder() {
 export function loadOrderForEditing(orderId) {
     const order = state.orderHistory.find(o => o.id === orderId);
     if (!order) return;
+
+    selectCompany(order.companyId); // UPDATED
 
     state.cart = [...order.items];
     state.selectedSupplierId = order.supplierId;

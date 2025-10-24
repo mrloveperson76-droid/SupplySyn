@@ -7,8 +7,31 @@ const cartList = document.getElementById('cart-list');
 const productsTitle = document.getElementById('products-title');
 const addProductBtn = document.getElementById('add-product-btn');
 const priceBreakdownEl = document.getElementById('price-breakdown');
+const companyFilterSelect = document.getElementById('company-filter-select');
 
-// START: New Function
+function renderCompanyFilter() {
+    const originalValue = companyFilterSelect.value;
+    companyFilterSelect.innerHTML = '';
+    state.companies.forEach(company => {
+        const option = document.createElement('option');
+        option.value = company.id;
+        option.textContent = company.name;
+        if (company.id === state.selectedCompanyId) {
+            option.selected = true;
+        }
+        companyFilterSelect.appendChild(option);
+    });
+    const addOption = document.createElement('option');
+    addOption.value = 'add_new_company';
+    addOption.textContent = '+ Add New Company';
+    companyFilterSelect.appendChild(addOption);
+
+    if (originalValue && state.companies.some(c => c.id == originalValue)) {
+        companyFilterSelect.value = originalValue;
+    }
+}
+
+
 function renderOrderDetails() {
     const { orderNumber, orderDate, paymentMethod, isPaid } = state.orderDetails;
     document.getElementById('order-number').value = orderNumber || '';
@@ -17,28 +40,23 @@ function renderOrderDetails() {
     document.getElementById('paid-status-toggle').checked = isPaid || false;
 }
 
-// Replace the existing renderOrderHistory function in ui.js
 function renderOrderHistory() {
     const historyList = document.getElementById('order-history-list');
     const searchTerm = document.getElementById('history-search').value.toLowerCase();
     historyList.innerHTML = '';
 
-    // START: Updated Filtering Logic
-    let filtered = state.orderHistory;
+    let filtered = state.orderHistory.filter(order => order.companyId === state.selectedCompanyId);
 
-    // 1. Filter by selected supplier if one is active
     if (state.selectedSupplierId) {
         filtered = filtered.filter(order => order.supplierId === state.selectedSupplierId);
     }
 
-    // 2. Filter by search term
     if (searchTerm) {
         filtered = filtered.filter(order =>
             order.orderNumber.toLowerCase().includes(searchTerm) ||
             order.supplierName.toLowerCase().includes(searchTerm)
         );
     }
-    // END: Updated Filtering Logic
 
     if (filtered.length === 0) {
         historyList.innerHTML = '<div class="empty-state">No past orders found.</div>';
@@ -52,7 +70,6 @@ function renderOrderHistory() {
             ? '<span class="paid-badge">PAID</span>'
             : '<span class="unpaid-badge">UNPAID</span>';
 
-        // START: Added Action Buttons
         el.innerHTML = `
             <div class="history-item-header">
                 <span class="order-number">${order.orderNumber}</span>
@@ -69,19 +86,44 @@ function renderOrderHistory() {
                 <button class="delete-btn delete-order-btn" data-id="${order.id}" title="Delete this order"><i class="fas fa-trash"></i> Delete</button>
             </div>
         `;
-        // END: Added Action Buttons
         historyList.appendChild(el);
     });
 }
 
-// END: New Function
-
 export function renderAll() {
+    renderCompanyFilter();
     renderSuppliers();
     renderOrderHistory();
     renderProducts();
     renderCart();
-    renderOrderDetails(); // Add this line
+    renderOrderDetails();
+}
+
+export function renderCompanyManagementList() {
+    const listEl = document.getElementById('company-management-list');
+    listEl.innerHTML = '';
+
+    if (state.companies.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">No companies found.</div>';
+        return;
+    }
+
+    state.companies.forEach(company => {
+        const el = document.createElement('div');
+        el.className = 'list-item';
+
+        el.innerHTML = `
+            <div class="item-info">
+                <strong>${company.name}</strong>
+                <small>${company.email || 'No email provided'}</small>
+            </div>
+            <div class="item-actions">
+                <button class="edit-company-btn button" data-id="${company.id}"><i class="fas fa-edit"></i> Edit</button>
+                <button class="delete-company-btn button" data-id="${company.id}" style="background-color: var(--red-color);"><i class="fas fa-trash"></i> Delete</button>
+            </div>
+        `;
+        listEl.appendChild(el);
+    });
 }
 
 function renderSuppliers() {
@@ -89,10 +131,11 @@ function renderSuppliers() {
     supplierList.innerHTML = '';
 
     const filtered = state.suppliers.filter(s => {
-        const nameMatch = s.name && s.name.toLowerCase().includes(searchTerm);
-        const emailMatch = s.email && s.email.toLowerCase().includes(searchTerm);
-        const phoneMatch = s.phone && s.phone.toLowerCase().includes(searchTerm);
-        const addressMatch = s.address && s.address.toLowerCase().includes(searchTerm);
+        if (s.companyId !== state.selectedCompanyId) return false;
+        const nameMatch = s.name?.toLowerCase().includes(searchTerm);
+        const emailMatch = s.email?.toLowerCase().includes(searchTerm);
+        const phoneMatch = s.phone?.toLowerCase().includes(searchTerm);
+        const addressMatch = s.address?.toLowerCase().includes(searchTerm);
         return nameMatch || emailMatch || phoneMatch || addressMatch;
     });
 
@@ -125,6 +168,8 @@ function renderProducts() {
     const searchTerm = document.getElementById('product-search').value.toLowerCase();
     productList.innerHTML = '';
     
+    const companyProducts = state.products.filter(p => p.companyId === state.selectedCompanyId);
+
     if (!state.selectedSupplierId) {
         productsTitle.innerHTML = '<i class="fas fa-box"></i> Products';
         addProductBtn.classList.add('hidden');
@@ -142,11 +187,11 @@ function renderProducts() {
     productsTitle.innerHTML = `<i class="fas fa-box"></i> Products from ${supplier.name}`;
     addProductBtn.classList.remove('hidden');
 
-    const filtered = state.products.filter(p => 
+    const filtered = companyProducts.filter(p => 
         p.supplierId === state.selectedSupplierId &&
         (p.title.toLowerCase().includes(searchTerm) || 
-         (p.code && p.code.toLowerCase().includes(searchTerm)) || 
-         (p.amazonCode && p.amazonCode.toLowerCase().includes(searchTerm)))
+         p.code?.toLowerCase().includes(searchTerm) || 
+         p.amazonCode?.toLowerCase().includes(searchTerm))
     );
 
     if (filtered.length === 0) {
@@ -184,13 +229,13 @@ function renderCart() {
     
     if (state.cart.length === 0) {
         cartList.innerHTML = '<div class="empty-state">Your cart is empty.</div>';
-        priceBreakdownEl.innerHTML = ''; // Clear prices
+        priceBreakdownEl.innerHTML = '';
         return;
     }
 
     state.cart.forEach(item => {
         const product = state.products.find(p => p.id === item.productId);
-        if (!product) return; // Should not happen, but good practice
+        if (!product) return;
         netTotal += product.price * item.quantity;
         const el = document.createElement('div');
         el.className = 'list-item';

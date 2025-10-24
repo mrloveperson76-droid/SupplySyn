@@ -2,7 +2,7 @@
 import { generatePdf, generatePdfFromHistory } from './services/pdfService.js';
 import * as State from './state.js';
 import { renderAll } from './ui.js';
-import { openModal, closeModal, showCustomConfirm } from './modal.js';
+import { openModal, closeModal, showCustomConfirm, openCompanyModal, closeCompanyModal, openCompanyListModal, closeCompanyListModal } from './modal.js';
 import { saveStateToLocalStorage } from './services/storageService.js';
 
 function renderAndSave() {
@@ -20,7 +20,6 @@ function handlePlaceOrder() {
 }
 
 function handleFormSave() {
-    // This function remains the same...
     if (State.state.editingItemType === 'supplier') {
         const name = document.getElementById('supplier-name').value;
         if (!name) { alert("Supplier name is required."); return; }
@@ -47,7 +46,89 @@ function handleFormSave() {
     renderAndSave();
 }
 
+function handleCompanyFormSave() {
+    const idValue = document.getElementById('company-id').value;
+    const id = idValue ? Number(idValue) : null;
+
+    const name = document.getElementById('company-name').value;
+    if (!name.trim()) {
+        alert('Company name is required.');
+        return;
+    }
+
+    const companyData = {
+        name: name.trim(),
+        address: document.getElementById('company-address').value.trim(),
+        email: document.getElementById('company-email').value.trim(),
+        phone: document.getElementById('company-phone').value.trim(),
+        website: document.getElementById('company-website').value.trim()
+    };
+
+    if (id) {
+        State.updateCompany({ id, ...companyData });
+    } else {
+        State.addCompany(companyData);
+    }
+
+    closeCompanyModal();
+    renderAndSave();
+}
+
 export function initializeEventListeners() {
+    document.getElementById('company-filter-select').addEventListener('change', (e) => {
+        const selectedValue = e.target.value;
+        if (selectedValue === 'add_new_company') {
+            openCompanyModal();
+        } else {
+            State.selectCompany(Number(selectedValue));
+            renderAndSave();
+        }
+    });
+
+    document.getElementById('manage-companies-btn').addEventListener('click', openCompanyListModal);
+
+    document.getElementById('company-list-close-btn').addEventListener('click', closeCompanyListModal);
+
+    document.getElementById('company-management-list').addEventListener('click', (e) => {
+        const editBtn = e.target.closest('.edit-company-btn');
+        const deleteBtn = e.target.closest('.delete-company-btn');
+        
+        if (editBtn) {
+            const companyId = Number(editBtn.dataset.id);
+            closeCompanyListModal();
+            openCompanyModal(companyId);
+        }
+
+        if (deleteBtn) {
+            const companyId = Number(deleteBtn.dataset.id);
+            if (State.state.companies.length <= 1) {
+                alert("You cannot delete the only company.");
+                return;
+            }
+            const company = State.state.companies.find(c => c.id === companyId);
+            if (company) {
+                showCustomConfirm('Delete Company?', `Delete "${company.name}" and all associated data? This cannot be undone.`, () => {
+                    State.deleteCompany(companyId);
+                    closeCompanyListModal();
+                    renderAndSave();
+                });
+            }
+        }
+    });
+
+    document.getElementById('company-save-btn').addEventListener('click', handleCompanyFormSave);
+    document.getElementById('company-cancel-btn').addEventListener('click', closeCompanyModal);
+    document.getElementById('company-delete-btn').addEventListener('click', () => {
+        const id = Number(document.getElementById('company-id').value);
+        if (id) {
+            showCustomConfirm('Delete Company?', 'Are you sure you want to delete this company and all of its associated data? This cannot be undone.', () => {
+                State.deleteCompany(id);
+                closeCompanyModal();
+                renderAndSave();
+            });
+        }
+    });
+
     document.getElementById('add-supplier-btn').addEventListener('click', () => openModal('supplier'));
     document.getElementById('add-product-btn').addEventListener('click', () => openModal('product'));
     document.getElementById('modal-save-btn').addEventListener('click', handleFormSave);
@@ -86,7 +167,6 @@ export function initializeEventListeners() {
                 renderAndSave();
             });
         } else {
-            // UPDATED: Now triggers re-render of orders as well
             State.selectSupplier(id);
             renderAll();
         }
@@ -116,7 +196,6 @@ export function initializeEventListeners() {
         renderAndSave();
     });
 
-    // --- START: New Listener for Order History Actions ---
     document.getElementById('order-history-list').addEventListener('click', (e) => {
         const previewBtn = e.target.closest('.preview-btn');
         const reprintBtn = e.target.closest('.reprint-btn');
@@ -126,7 +205,7 @@ export function initializeEventListeners() {
             const orderId = Number(previewBtn.dataset.id);
             showCustomConfirm('Load Order?', 'This will replace your current order with the selected historical order. Are you sure?', () => {
                 State.loadOrderForEditing(orderId);
-                renderAll(); // Re-render to show the loaded order
+                renderAll();
             });
         }
 
@@ -146,5 +225,4 @@ export function initializeEventListeners() {
             });
         }
     });
-    // --- END: New Listener for Order History Actions ---
 }

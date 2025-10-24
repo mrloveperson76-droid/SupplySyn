@@ -1,7 +1,7 @@
 // js/modal.js
 import { state } from './state.js';
 import { applyImportChanges } from './state.js';
-import { renderAll } from './ui.js';
+import { renderAll, renderCompanyManagementList } from './ui.js';
 import { saveStateToLocalStorage } from './services/storageService.js';
 
 const modal = document.getElementById('modal');
@@ -12,7 +12,55 @@ const customAlert = document.getElementById('custom-alert');
 const verificationModal = document.getElementById('verification-modal');
 const verificationModalBody = document.getElementById('verification-modal-body');
 
+const companyModal = document.getElementById('company-modal');
+const companyModalTitle = document.getElementById('company-modal-title');
+const companyDeleteBtn = document.getElementById('company-delete-btn');
+
+const companyListModal = document.getElementById('company-list-modal');
+
 let alertConfirmCallback = null;
+
+export function openCompanyListModal() {
+    renderCompanyManagementList(); // Call the function to build the list
+    companyListModal.classList.remove('hidden');
+}
+
+export function closeCompanyListModal() {
+    companyListModal.classList.add('hidden');
+}
+
+function clearVerificationModal() {
+    verificationModalBody.innerHTML = '';
+}
+
+export function openCompanyModal(companyId = null) {
+    const form = document.getElementById('company-modal-form');
+    form.reset();
+    document.getElementById('company-id').value = companyId || '';
+
+    const company = companyId ? state.companies.find(c => c.id === companyId) : null;
+
+    if (company) {
+        companyModalTitle.textContent = 'Edit Company Details';
+        document.getElementById('company-name').value = company.name;
+        document.getElementById('company-address').value = company.address || '';
+        document.getElementById('company-email').value = company.email || '';
+        document.getElementById('company-phone').value = company.phone || '';
+        document.getElementById('company-website').value = company.website || '';
+        companyDeleteBtn.classList.remove('hidden');
+    } else {
+        companyModalTitle.textContent = 'Add New Company';
+        companyDeleteBtn.classList.add('hidden');
+    }
+
+    companyModal.classList.remove('hidden');
+}
+
+
+export function closeCompanyModal() {
+    companyModal.classList.add('hidden');
+}
+
 
 export function showInfoAlert(title, message) {
     const alertTitle = document.getElementById('custom-alert-title');
@@ -88,7 +136,7 @@ export function openModal(type, id = null) {
             <div class="modal-form-field"><label for="product-title">Item Title</label><input type="text" id="product-title" value="${product.title || ''}" required></div>
             <div class="modal-form-field"><label for="product-code">Supplier Code</label><input type="text" id="product-code" value="${product.code || ''}"></div>
             <div class="modal-form-field"><label for="product-amazon-code">Amazon Code</label><input type="text" id="product-amazon-code" value="${product.amazonCode || ''}"></div>
-            <div class="modal-form-field"><label for="product-price">Purchase Price</label><input type="number" id="product-price" step="0.01" min="0" value="${product.price || ''}" required></div>
+            <div class="modal-form-field"><label for="product-price">Purchase Price</label><input type="number" id="product-price" step="0.01" min="0" value="${product.price ?? 0}" required></div>
             <div class="modal-form-field"><label for="product-desc">Description</label><textarea id="product-desc" rows="3">${product.desc || ''}</textarea></div>
         `;
     }
@@ -153,15 +201,11 @@ export function hideCustomConfirm() {
     alertConfirmCallback = null;
 }
 
-/**
- * --- BUG FIX ---
- * Added hideCustomConfirm() to ensure the dialog closes after the action.
- */
 document.getElementById('alert-confirm-btn').addEventListener('click', () => {
     if (alertConfirmCallback) {
         alertConfirmCallback();
     }
-    hideCustomConfirm(); // This was the missing line
+    hideCustomConfirm();
 });
 
 document.getElementById('alert-cancel-btn').addEventListener('click', hideCustomConfirm);
@@ -174,15 +218,15 @@ function renderVerificationItem(item, type) {
     let fieldsHtml = '';
     if (isSupplier) {
         fieldsHtml = `
-            <div class="verification-field"><label>Email</label><input type="text" data-field="email" value="${item.data.email || ''}"> ${item.isNew ? '' : `<div class="original-value">${item.original.email || 'N/A'}</div>`}</div>
-            <div class="verification-field"><label>Phone</label><input type="text" data-field="phone" value="${item.data.phone || ''}"> ${item.isNew ? '' : `<div class="original-value">${item.original.phone || 'N/A'}</div>`}</div>
-            <div class="verification-field"><label>Address</label><input type="text" data-field="address" value="${item.data.address || ''}"> ${item.isNew ? '' : `<div class="original-value">${item.original.address || 'N/A'}</div>`}</div>
+            <div class="verification-field"><label>Email</label><input type="text" data-field="email" value="${item.data.email || ''}"> ${!item.isNew && item.original ? `<div class="original-value">${item.original.email || 'N/A'}</div>` : ''}</div>
+            <div class="verification-field"><label>Phone</label><input type="text" data-field="phone" value="${item.data.phone || ''}"> ${!item.isNew && item.original ? `<div class="original-value">${item.original.phone || 'N/A'}</div>` : ''}</div>
+            <div class="verification-field"><label>Address</label><input type="text" data-field="address" value="${item.data.address || ''}"> ${!item.isNew && item.original ? `<div class="original-value">${item.original.address || 'N/A'}</div>` : ''}</div>
         `;
-    } else { // Product
+    } else {
         fieldsHtml = `
-            <div class="verification-field"><label>Product Title</label><input type="text" data-field="title" value="${item.data.title || ''}"> ${item.isNew ? '' : `<div class="original-value">${item.original.title || 'N/A'}</div>`}</div>
-            <div class="verification-field"><label>Product Price</label><input type="number" step="0.01" data-field="price" value="${item.data.price || 0}"> ${item.isNew ? '' : `<div class="original-value">${item.original.price || 'N/A'}</div>`}</div>
-            <div class="verification-field"><label>Supplier Code</label><input type="text" data-field="code" value="${item.data.code || ''}"> ${item.isNew ? '' : `<div class="original-value">${item.original.code || 'N/A'}</div>`}</div>
+            <div class="verification-field"><label>Product Title</label><input type="text" data-field="title" value="${item.data.title || ''}"> ${!item.isNew && item.original ? `<div class="original-value">${item.original.title || 'N/A'}</div>` : ''}</div>
+            <div class="verification-field"><label>Product Price</label><input type="number" step="0.01" data-field="price" value="${item.data.price ?? 0}"> ${!item.isNew && item.original ? `<div class="original-value">${item.original.price ?? 'N/A'}</div>` : ''}</div>
+            <div class="verification-field"><label>Supplier Code</label><input type="text" data-field="code" value="${item.data.code || ''}"> ${!item.isNew && item.original ? `<div class="original-value">${item.original.code || 'N/A'}</div>` : ''}</div>
         `;
     }
 
@@ -199,7 +243,7 @@ function renderVerificationItem(item, type) {
         <div class="verification-item ${itemClass}" data-item-id="${itemId}" data-item-type="${type}">
             <div class="verification-item-header">
                 <input type="checkbox" class="item-checkbox" checked>
-                <strong>${isSupplier ? item.data.name : item.data.amazonCode} (${item.isNew ? 'NEW' : 'UPDATE'})</strong>
+                <strong>${isSupplier ? item.data.name : (item.data.amazonCode || 'N/A')} (${item.isNew ? 'NEW' : 'UPDATE'})</strong>
                 <span>${isSupplier ? '' : `Supplier: ${item.data.supplierName}`}</span>
             </div>
             <div class="verification-item-body">
@@ -212,24 +256,25 @@ function renderVerificationItem(item, type) {
 
 
 export function showVerificationModal(changes) {
+    clearVerificationModal(); 
     let content = '';
 
-    if (changes.newSuppliers.length > 0) {
+    if (changes.newSuppliers?.length > 0) {
         content += '<div class="verification-section"><h4>New Suppliers & Their Products</h4>';
         changes.newSuppliers.forEach(supplier => content += renderVerificationItem(supplier, 'supplier'));
         content += '</div>';
     }
-    if (changes.updatedSuppliers.length > 0) {
+    if (changes.updatedSuppliers?.length > 0) {
         content += '<div class="verification-section"><h4>Updates to Existing Suppliers</h4>';
         changes.updatedSuppliers.forEach(supplier => content += renderVerificationItem(supplier, 'supplier-update'));
         content += '</div>';
     }
-    if (changes.newProductsForExistingSuppliers.length > 0) {
+    if (changes.newProductsForExistingSuppliers?.length > 0) {
         content += '<div class="verification-section"><h4>New Products for Existing Suppliers</h4>';
         changes.newProductsForExistingSuppliers.forEach(product => content += renderVerificationItem(product, 'product'));
         content += '</div>';
     }
-    if (changes.updatedProducts.length > 0) {
+    if (changes.updatedProducts?.length > 0) {
         content += '<div class="verification-section"><h4>Updates to Existing Products</h4>';
         changes.updatedProducts.forEach(product => content += renderVerificationItem(product, 'product-update'));
         content += '</div>';
@@ -256,14 +301,16 @@ function gatherVerifiedChanges() {
             const type = item.dataset.itemType;
             const data = {};
             item.querySelectorAll(':scope > .verification-item-body > .verification-fields input[data-field]').forEach(input => {
-                data[input.dataset.field] = input.type === 'number' ? parseFloat(input.value) : input.value;
+                data[input.dataset.field] = input.type === 'number' ? parseFloat(input.value) : (input.value || '');
             });
+            
+            const rawHeaderText = item.querySelector('strong').textContent;
+            const cleanName = rawHeaderText.replace(/\s*\((NEW|UPDATE)\)$/, '').trim();
 
             const supplierNameText = item.querySelector('span')?.textContent.replace('Supplier: ', '').trim();
-            const strongText = item.querySelector('strong').textContent.split(' ')[0];
-
+            
             if (type === 'supplier') {
-                changesToApply.newSuppliers.push({ name: strongText, ...data });
+                changesToApply.newSuppliers.push({ name: cleanName, ...data });
 
                 const nestedProductItems = item.querySelectorAll('.verification-product-list .verification-item');
                 nestedProductItems.forEach(productItem => {
@@ -271,18 +318,18 @@ function gatherVerifiedChanges() {
                     if (productCheckbox.checked) {
                         const productData = {};
                         productItem.querySelectorAll(':scope > .verification-item-body > .verification-fields input[data-field]').forEach(input => {
-                            productData[input.dataset.field] = input.type === 'number' ? parseFloat(input.value) : input.value;
+                            productData[input.dataset.field] = input.type === 'number' ? parseFloat(input.value) : (input.value || '');
                         });
                         const amazonCode = productItem.querySelector('strong').textContent.split(' ')[0];
-                        changesToApply.newProducts.push({ amazonCode, supplierName: strongText, ...productData });
+                        changesToApply.newProducts.push({ amazonCode, supplierName: cleanName, ...productData });
                     }
                 });
             } else if (type === 'supplier-update') {
-                changesToApply.updatedSuppliers.push({ name: strongText, ...data });
+                changesToApply.updatedSuppliers.push({ name: cleanName, ...data });
             } else if (type === 'product') {
-                 changesToApply.newProducts.push({ amazonCode: strongText, supplierName: supplierNameText, ...data });
+                 changesToApply.newProducts.push({ amazonCode: cleanName, supplierName: supplierNameText, ...data });
             } else if (type === 'product-update') {
-                 changesToApply.updatedProducts.push({ amazonCode: strongText, supplierName: supplierNameText, ...data });
+                 changesToApply.updatedProducts.push({ amazonCode: cleanName, supplierName: supplierNameText, ...data });
             }
         });
     });
@@ -295,6 +342,8 @@ document.getElementById('verification-confirm-btn').addEventListener('click', ()
     const verifiedChanges = gatherVerifiedChanges();
     if (Object.values(verifiedChanges).every(arr => arr.length === 0)) {
         showInfoAlert("No Changes", "No items were selected to import or update.");
+        verificationModal.classList.add('hidden');
+        clearVerificationModal(); 
         return;
     }
 
@@ -309,12 +358,14 @@ document.getElementById('verification-confirm-btn').addEventListener('click', ()
     saveStateToLocalStorage(state);
     renderAll();
     verificationModal.classList.add('hidden');
+    clearVerificationModal(); 
     
     showInfoAlert("Import Complete", summary);
 });
 
 document.getElementById('verification-cancel-btn').addEventListener('click', () => {
     verificationModal.classList.add('hidden');
+    clearVerificationModal(); 
 });
 
 document.getElementById('verification-select-all').addEventListener('click', () => {

@@ -3,9 +3,48 @@
 import { showInfoAlert, showVerificationModal } from '../modal.js';
 
 /**
- * --- NEW FUNCTION ---
+ * --- DEFINITIVE FIX V8 ---
+ * A final, robust comparison function to resolve all import loop scenarios.
+ * This version correctly handles both numeric type coercion and empty/zero value equivalence.
+ *
+ * - It safely normalizes null and undefined values.
+ * - For numeric comparisons, it explicitly treats empty strings as 0 before
+ * parsing, ensuring that an empty cell in the spreadsheet is seen as
+ * identical to a 0 in the application data.
+ * - It compares the final numeric values, correctly equating `15.9` (number)
+ * with `"15.90"` (string).
+ *
+ * @param {*} fileValue - The value from the import file.
+ * @param {*} appValue - The value from the application state.
+ * @param {boolean} [isNumeric=false] - A flag to indicate if the comparison is for a numeric field.
+ * @returns {boolean} - True if the values are considered different, otherwise false.
+ */
+function areValuesDifferent(fileValue, appValue, isNumeric = false) {
+    const v1 = fileValue ?? '';
+    const v2 = appValue ?? '';
+
+    if (isNumeric) {
+        // Coerce empty strings and null to 0 for a reliable numeric comparison.
+        const num1 = (v1 === '' || v1 === null) ? 0 : parseFloat(v1);
+        const num2 = (v2 === '' || v2 === null) ? 0 : parseFloat(v2);
+
+        // If both values, after coercion, are not valid numbers (e.g., they were text),
+        // then consider them the same.
+        if (isNaN(num1) && isNaN(num2)) {
+            return false;
+        }
+
+        // Return true only if the final numeric values are different.
+        return num1 !== num2;
+    }
+
+    // For all non-numeric fields, a simple string comparison is sufficient.
+    return String(v1).trim() !== String(v2).trim();
+}
+
+
+/**
  * Validates the imported data before processing.
- * Checks for mandatory fields and correct data types.
  * @param {Array} data The data from the imported file.
  * @returns {string|null} An error message string if validation fails, otherwise null.
  */
@@ -16,37 +55,29 @@ function preImportValidation(data) {
 
     for (let i = 0; i < data.length; i++) {
         const row = data[i];
-        const rowNumber = i + 2; // Excel rows are 1-based, plus header
+        const rowNumber = i + 2;
 
         const supplierName = row['Supplier Name'];
         const productTitle = row['Product Title'];
+        const amazonCode = row['Amazon Code'];
 
-        // Rule 1: Supplier Name is mandatory
         if (!supplierName || String(supplierName).trim() === '') {
-            return `Validation Error on row ${rowNumber}: 'Supplier Name' cannot be empty.`;
-        }
-        // Rule 2: Supplier Name cannot be a number
-        if (!isNaN(supplierName)) {
-            return `Validation Error on row ${rowNumber}: 'Supplier Name' cannot be a number.`;
+            return `Validation Error on row ${rowNumber}: 'Supplier Name' is a compulsory column and cannot be empty.`;
         }
 
-        // If a product title exists, it must be valid.
-        if (productTitle !== undefined && String(productTitle).trim() !== '') {
-             // Rule 3: Product Title cannot be a number
-            if (!isNaN(productTitle)) {
-                return `Validation Error on row ${rowNumber}: 'Product Title' cannot be a number.`;
+        if ((productTitle && String(productTitle).trim() !== '')) {
+            if (!amazonCode || String(amazonCode).trim() === '') {
+                return `Validation Error on row ${rowNumber}: 'Amazon Code' is compulsory when a 'Product Title' is present.`;
             }
         }
     }
-
-    return null; // All checks passed
+    return null;
 }
 
 
 function handleFileImport(file, state) {
     if (typeof XLSX === 'undefined') {
-        console.error("SheetJS library (XLSX) not found. Make sure the library is loaded correctly.");
-        showInfoAlert("Import Error", "A required library (SheetJS) failed to load. Please check your internet connection and try again.");
+        showInfoAlert("Import Error", "A required library (SheetJS) failed to load.");
         return;
     }
 
@@ -60,7 +91,6 @@ function handleFileImport(file, state) {
             const worksheet = workbook.Sheets[firstSheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-            // --- UPDATED: Run pre-import validation first ---
             const validationError = preImportValidation(jsonData);
             if (validationError) {
                 showInfoAlert("Import Failed", validationError);
@@ -71,7 +101,7 @@ function handleFileImport(file, state) {
 
         } catch (error) {
             console.error("Error processing file:", error);
-            showInfoAlert("Import Error", "There was an error processing your file. Please ensure it's a valid Excel or CSV file.");
+            showInfoAlert("Import Error", "There was an error processing your file.");
         }
     };
     reader.readAsArrayBuffer(file);
@@ -95,14 +125,14 @@ function processImportedData(data, state) {
         const amazonCode = row['Amazon Code']?.toString().trim();
         const productKey = `${supplierName.toLowerCase()}-${amazonCode}`;
         
-        const existingSupplier = state.suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
+        const existingSupplier = state.suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase() && s.companyId === state.selectedCompanyId);
         
         if (!processedSupplierNames.has(supplierName.toLowerCase())) {
             const rowSupplierData = {
                 name: supplierName,
-                email: row['Supplier Email'] || '',
-                phone: row['Supplier Phone'] || '',
-                address: row['Supplier Address'] || ''
+                email: row['Supplier Email'],
+                phone: row['Supplier Phone'],
+                address: row['Supplier Address']
             };
 
             if (!existingSupplier) {
@@ -111,8 +141,8 @@ function processImportedData(data, state) {
                 const supChanges = {};
                 let hasUpdate = false;
                 for (const key of ['email', 'phone', 'address']) {
-                    if (rowSupplierData[key] && rowSupplierData[key] !== existingSupplier[key]) {
-                        supChanges[key] = rowSupplierData[key];
+                    if (areValuesDifferent(rowSupplierData[key], existingSupplier[key])) {
+                        supChanges[key] = rowSupplierData[key] || '';
                         hasUpdate = true;
                     }
                 }
@@ -128,16 +158,15 @@ function processImportedData(data, state) {
         }
 
         if (amazonCode && !processedProductKeys.has(productKey)) {
-             const existingProduct = state.products.find(p => {
-                if (p.amazonCode?.toLowerCase() !== amazonCode.toLowerCase()) return false;
-                const pSupplier = state.suppliers.find(s => s.id === p.supplierId);
-                return pSupplier && pSupplier.name.toLowerCase() === supplierName.toLowerCase();
-            });
+             const currentSupplierInState = existingSupplier || state.suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase() && s.companyId === state.selectedCompanyId);
+             const existingProduct = currentSupplierInState 
+                ? state.products.find(p => p.supplierId === currentSupplierInState.id && p.amazonCode?.toLowerCase() === amazonCode.toLowerCase())
+                : null;
 
             const rowProductData = {
-                title: row['Product Title'] || 'N/A',
-                price: parseFloat(row['Product Price']) || 0,
-                code: row['Product Code (Supplier)']?.toString() || '',
+                title: row['Product Title'],
+                price: row['Product Price'],
+                code: row['Product Code (Supplier)'],
                 amazonCode: amazonCode,
                 supplierName: supplierName
             };
@@ -153,12 +182,20 @@ function processImportedData(data, state) {
             } else {
                 const prodChanges = {};
                 let hasUpdate = false;
-                for (const key of ['title', 'price', 'code']) {
-                     if (rowProductData[key] && rowProductData[key].toString() !== existingProduct[key].toString()) {
-                        prodChanges[key] = rowProductData[key];
-                        hasUpdate = true;
-                    }
+
+              if (areValuesDifferent(rowProductData.price, existingProduct.price, true)) {
+                     prodChanges.price = parseFloat(rowProductData.price) || 0;
+                     hasUpdate = true;
                 }
+                if (areValuesDifferent(rowProductData.title, existingProduct.title)) {
+                     prodChanges.title = rowProductData.title || 'N/A';
+                     hasUpdate = true;
+                }
+                 if (areValuesDifferent(rowProductData.code, existingProduct.code)) {
+                     prodChanges.code = rowProductData.code || '';
+                     hasUpdate = true;
+                }
+                
                 if (hasUpdate) {
                     changes.updatedProducts.push({
                         isNew: false,
@@ -185,17 +222,16 @@ function handleDataExport(state) {
     const defaultFileName = `SupplySync_Export_${new Date().toISOString().slice(0, 10)}`;
     let userFileName = prompt("Please update the export file name:", defaultFileName);
 
-    if (userFileName === null || userFileName.trim() === "") {
-        console.log("Export cancelled by user.");
-        return;
-    }
+    if (!userFileName || userFileName.trim() === "") return;
 
     if (!userFileName.toLowerCase().endsWith('.xlsx')) {
         userFileName += '.xlsx';
     }
 
     const exportData = [];
-    state.suppliers.forEach(supplier => {
+    const companySuppliers = state.suppliers.filter(s => s.companyId === state.selectedCompanyId);
+
+    companySuppliers.forEach(supplier => {
         const productsOfSupplier = state.products.filter(p => p.supplierId === supplier.id);
 
         if (productsOfSupplier.length > 0) {
@@ -216,11 +252,7 @@ function handleDataExport(state) {
                 'Supplier Name': supplier.name,
                 'Supplier Email': supplier.email,
                 'Supplier Phone': supplier.phone,
-                'Supplier Address': supplier.address,
-                'Product Title': '',
-                'Product Price': '',
-                'Product Code (Supplier)': '',
-                'Amazon Code': ''
+                'Supplier Address': supplier.address
             });
         }
     });
