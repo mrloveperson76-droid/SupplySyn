@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupplySync</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-boxes-stacked"></i> SupplySync</h1>
+            <div class="data-controls">
+                <button id="import-btn" title="Import suppliers and products from a file"><i class="fas fa-file-import"></i> Import</button>
+                <button id="export-btn" title="Export all data to an Excel file"><i class="fas fa-file-export"></i> Export</button>
+                <input type="file" id="import-file-input" accept=".xlsx, .xls, .csv" style="display: none;">
+            </div>
+        </header>
+
+        <main class="main-layout-history">
+            <section class="panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-users"></i> Suppliers</h2>
+                    <button id="add-supplier-btn" title="Add New Supplier" class="add-btn"><i class="fas fa-plus"></i></button>
+                </div>
+                <input type="text" id="supplier-search" class="search-bar" placeholder="Search suppliers...">
+                <div id="supplier-list" class="list"></div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-history"></i> Order History</h2>
+                </div>
+                <input type="text" id="history-search" class="search-bar" placeholder="Search by Order # or Supplier">
+                <div id="order-history-list" class="list"></div>
+            </section>
+            <section class="panel panel-large">
+                <div class="panel-header">
+                    <h2 id="products-title"><i class="fas fa-box"></i> Products</h2>
+                    <button id="add-product-btn" title="Add New Product" class="add-btn hidden"><i class="fas fa-plus"></i></button>
+                </div>
+                 <input type="text" id="product-search" class="search-bar" placeholder="Search products...">
+                <div id="product-list" class="list"></div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-shopping-cart"></i> Current Order</h2>
+                    <button id="clear-cart-btn" title="Clear Cart"><i class="fas fa-trash-alt"></i> Clear</button>
+                </div>
+                <div id="cart-list" class="list"></div>
+                <div class="cart-summary">
+                    <div class="order-details">
+                        <div class="order-detail-field">
+                            <label for="order-number">Order #</label>
+                            <input type="text" id="order-number" placeholder="e.g., PO-1001">
+                        </div>
+                        <div class="order-detail-field">
+                            <label for="order-date">Date</label>
+                            <input type="date" id="order-date">
+                        </div>
+                        <div class="order-detail-field">
+                            <label for="payment-method">Payment</label>
+                            <select id="payment-method">
+                                <option>Credit Card</option>
+                                <option>Bank</option>
+                                <option>Future payment</option>
+                            </select>
+                        </div>
+                        <div class="order-detail-field paid-status">
+                            <label for="paid-status-toggle">Paid</label>
+                            <label class="switch">
+                                <input type="checkbox" id="paid-status-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="vat-control">
+                        <label for="vat-toggle">Add 20% VAT</label>
+                        <label class="switch">
+                            <input type="checkbox" id="vat-toggle">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div id="price-breakdown"></div>
+                    <div class="cart-actions">
+                        <button id="generate-pdf-btn" class="secondary-button"><i class="fas fa-file-pdf"></i> Generate PDF</button>
+                        <button id="place-order-btn" class="cta-button"><i class="fas fa-check"></i> Place Order</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 id="modal-title">Add New Supplier</h3>
+            <form id="modal-form"></form>
+            <div class="modal-actions">
+                <button id="modal-save-btn" class="cta-button"><i class="fas fa-check"></i> Save</button>
+                <button id="modal-cancel-btn"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="custom-alert" class="modal-backdrop hidden">
+        <div class="modal-content alert-modal">
+            <h3 id="custom-alert-title">Confirmation</h3>
+            <p id="custom-alert-message">Are you sure?</p>
+            <div class="modal-actions">
+                <button id="alert-confirm-btn" class="cta-button">Confirm</button>
+                <button id="alert-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="verification-modal" class="modal-backdrop hidden">
+        <div class="modal-content verification-modal-content">
+            <h3 id="verification-modal-title">Confirm Import Changes</h3>
+            <div id="verification-modal-body" class="verification-modal-body">
+                </div>
+            <div class="modal-actions verification-modal-actions">
+                <div>
+                    <button id="verification-select-all" class="secondary-button"><i class="fas fa-check-double"></i> Select All</button>
+                    <button id="verification-deselect-all" class="secondary-button"><i class="fas fa-square"></i> Deselect All</button>
+                </div>
+                <div>
+                    <button id="verification-cancel-btn" class="secondary-button"><i class="fas fa-times"></i> Cancel</button>
+                    <button id="verification-confirm-btn" class="cta-button"><i class="fas fa-check"></i> Confirm Selected Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
