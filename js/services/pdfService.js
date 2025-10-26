@@ -138,7 +138,11 @@ export function generatePdf(state) {
     const doc = new jsPDF();
 
     const company = state.companies.find(c => c.id === state.selectedCompanyId);
-    const supplier = state.suppliers.find(s => s.id === state.selectedSupplierId);
+    // Get supplier ID from the supplier filter dropdown
+    const supplierFilter = document.getElementById('supplier-filter');
+    // Convert supplierId to float to ensure consistency with decimal IDs
+    const supplierId = supplierFilter ? parseFloat(supplierFilter.value) : state.selectedSupplierId;
+    const supplier = state.suppliers.find(s => s.id === supplierId);
     const items = state.cart.map(cartItem => ({
         ...cartItem,
         product: state.products.find(p => p.id === cartItem.productId)

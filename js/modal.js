@@ -124,6 +124,28 @@ export function openModal(type, id = null) {
         const product = state.products.find(p => p.id === id) || {};
         modalTitle.textContent = id ? 'Edit Product' : 'Add New Product';
         state.tempPhoto = product.photo || null;
+        
+        // Get suppliers for the current company
+        const companySuppliers = state.suppliers.filter(s => s.companyId === state.selectedCompanyId);
+        
+        // Check if there are suppliers available
+        if (companySuppliers.length === 0) {
+            modalForm.innerHTML = `
+                <div class="modal-form-field">
+                    <p>No suppliers available. Please add a supplier first.</p>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+            return;
+        }
+        
+        // Create supplier options
+        let supplierOptions = '';
+        companySuppliers.forEach(supplier => {
+            const selected = product.supplierId === supplier.id ? 'selected' : '';
+            supplierOptions += `<option value="${supplier.id}" ${selected}>${supplier.name}</option>`;
+        });
+        
         modalForm.innerHTML = `
             <div class="modal-photo-field">
                 <div id="photo-preview" class="modal-photo-preview"><i class="fas fa-box"></i></div>
@@ -132,6 +154,13 @@ export function openModal(type, id = null) {
                     <input type="file" id="photo-input" accept="image/*" style="display: none;">
                     <button type="button" id="remove-photo-btn">Remove Photo</button>
                 </div>
+            </div>
+            <div class="modal-form-field">
+                <label for="product-supplier">Supplier</label>
+                <select id="product-supplier" required>
+                    <option value="">Select a Supplier</option>
+                    ${supplierOptions}
+                </select>
             </div>
             <div class="modal-form-field"><label for="product-title">Item Title</label><input type="text" id="product-title" value="${product.title || ''}" required></div>
             <div class="modal-form-field"><label for="product-code">Supplier Code</label><input type="text" id="product-code" value="${product.code || ''}"></div>

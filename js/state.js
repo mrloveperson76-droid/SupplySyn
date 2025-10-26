@@ -1,4 +1,6 @@
 // js/state.js
+import { updateViewOnSupplierSelect } from './ui.js';
+
 export const state = {
     companies: [{ id: 1, name: 'Default Company', address: '', email: '', phone: '', website: '' }],
     selectedCompanyId: 1,
@@ -110,7 +112,16 @@ export function applyImportChanges(changes) {
 
 
 export function selectSupplier(id) {
-    state.selectedSupplierId = id;
+    // Instead of setting state.selectedSupplierId, we'll update the UI directly
+    // This function is primarily used when navigating from supplier to products view
+    import('./ui.js').then(ui => {
+        const supplierFilter = document.getElementById('supplier-filter');
+        if (supplierFilter) {
+            // Convert id to string to ensure consistency
+            supplierFilter.value = id.toString();
+            ui.renderProducts();
+        }
+    });
 }
 
 export function saveItem(itemData) {
@@ -175,7 +186,12 @@ export function updateOrderDetails(details) {
 export function placeOrder() {
     if (state.cart.length === 0) return null;
 
-    const supplier = state.suppliers.find(s => s.id === state.selectedSupplierId);
+    // Get supplier ID from the supplier filter dropdown
+    const supplierFilter = document.getElementById('supplier-filter');
+    // Convert supplierId to float to ensure consistency with decimal IDs
+    const supplierId = supplierFilter ? parseFloat(supplierFilter.value) : state.selectedSupplierId;
+    const supplier = state.suppliers.find(s => s.id === supplierId);
+    
     let netTotal = 0;
     state.cart.forEach(item => {
         const product = state.products.find(p => p.id === item.productId);
@@ -188,7 +204,7 @@ export function placeOrder() {
     const orderPayload = {
         orderNumber: state.orderDetails.orderNumber,
         orderDate: state.orderDetails.orderDate,
-        supplierId: state.selectedSupplierId,
+        supplierId: supplierId,
         supplierName: supplier ? supplier.name : 'N/A',
         totalPrice: grandTotal,
         isPaid: state.orderDetails.isPaid,
@@ -218,7 +234,8 @@ export function loadOrderForEditing(orderId) {
     selectCompany(order.companyId); // UPDATED
 
     state.cart = [...order.items];
-    state.selectedSupplierId = order.supplierId;
+    // Instead of setting state.selectedSupplierId, we'll update the UI directly
+    selectSupplier(order.supplierId);
     state.orderDetails = {
         orderNumber: order.orderNumber,
         orderDate: order.orderDate,

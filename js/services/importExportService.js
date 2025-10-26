@@ -76,7 +76,7 @@ function preImportValidation(data) {
 }
 
 
-function handleFileImport(file, state) {
+export function handleFileImport(file, state) {
     if (typeof XLSX === 'undefined') {
         showInfoAlert("Import Error", "A required library (SheetJS) failed to load.");
         return;
@@ -115,7 +115,7 @@ function handleFileImport(file, state) {
     reader.readAsArrayBuffer(file);
 }
 
-function processImportedData(data, state) {
+export function processImportedData(data, state) {
     const changes = {
         newSuppliers: [],
         updatedSuppliers: [],
@@ -226,7 +226,7 @@ function processImportedData(data, state) {
     }
 }
 
-function handleDataExport(state) {
+export function handleDataExport(state) {
     const defaultFileName = `SupplySync_Export_${new Date().toISOString().slice(0, 10)}`;
     let userFileName = prompt("Please update the export file name:", defaultFileName);
 
@@ -277,15 +277,21 @@ export function initializeImportExportEventListeners(state) {
     const exportBtn = document.getElementById('export-btn');
     const fileInput = document.getElementById('import-file-input');
 
-    importBtn.addEventListener('click', () => fileInput.click());
+    if (importBtn) {
+        importBtn.addEventListener('click', () => fileInput.click());
+    }
     
-    fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            handleFileImport(file, state);
-        }
-        event.target.value = null;
-    });
+    if (fileInput) {
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                handleFileImport(file, state);
+            }
+            event.target.value = null;
+        });
+    }
 
-    exportBtn.addEventListener('click', () => handleDataExport(state));
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => handleDataExport(state));
+    }
 }

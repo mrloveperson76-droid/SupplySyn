@@ -1,19 +1,28 @@
 // js/services/storageService.js
 import { state } from '../state.js';
+import { getCurrentUser } from '../services/authService.js';
+
+// Get the storage key for the current user
+function getUserStorageKey() {
+    const user = getCurrentUser();
+    return user ? `supplySyncData_${user.id}` : 'supplySyncData';
+}
 
 export function saveStateToLocalStorage(currentState) {
     try {
         const stateToSave = {
             companies: currentState.companies,
-            selectedCompanyId: currentState.selectedCompanyId, // UPDATED
+            selectedCompanyId: currentState.selectedCompanyId,
             suppliers: currentState.suppliers,
             products: currentState.products,
             cart: currentState.cart,
             vatEnabled: currentState.vatEnabled,
             orderDetails: currentState.orderDetails,
-            orderHistory: currentState.orderHistory
+            orderHistory: currentState.orderHistory,
+            selectedSupplierId: currentState.selectedSupplierId // Add this line to save selected supplier
         };
-        localStorage.setItem('supplySyncData', JSON.stringify(stateToSave));
+        const storageKey = getUserStorageKey();
+        localStorage.setItem(storageKey, JSON.stringify(stateToSave));
     } catch (error) {
         console.error("Could not save data to local storage:", error);
         alert("Error: Could not save data. The browser's storage might be full.");
@@ -22,7 +31,8 @@ export function saveStateToLocalStorage(currentState) {
 
 export function loadStateFromLocalStorage() {
     try {
-        const savedData = localStorage.getItem('supplySyncData');
+        const storageKey = getUserStorageKey();
+        const savedData = localStorage.getItem(storageKey);
         if (savedData) {
             const loadedState = JSON.parse(savedData);
 
@@ -61,16 +71,43 @@ export function loadStateFromLocalStorage() {
 
             state.cart = loadedState.cart || [];
             state.vatEnabled = loadedState.vatEnabled || false;
+            // Load selected supplier ID if it exists
+            state.selectedSupplierId = loadedState.selectedSupplierId || null;
             
             if (loadedState.orderDetails) {
                 state.orderDetails = loadedState.orderDetails;
             }
-            document.getElementById('vat-toggle').checked = state.vatEnabled;
+            
+            // Only set the VAT toggle if the element exists (app is initialized)
+            const vatToggle = document.getElementById('vat-toggle');
+            if (vatToggle) {
+                vatToggle.checked = state.vatEnabled;
+            }
+            
             return true;
+        } else {
+            // If no saved data, initialize with default company
+            const defaultCompany = { id: 1, name: 'Default Company', address: '', email: '', phone: '', website: '' };
+            state.companies = [defaultCompany];
+            state.selectedCompanyId = 1;
+            state.suppliers = [];
+            state.products = [];
+            state.orderHistory = [];
+            state.cart = [];
+            state.vatEnabled = false;
+            state.orderDetails = {
+                orderNumber: '',
+                orderDate: new Date().toISOString().slice(0, 10),
+                paymentMethod: 'Credit Card',
+                isPaid: false
+            };
+            state.selectedSupplierId = null;
+            
+            return false;
         }
     } catch (error) {
         console.error("Could not load data from local storage:", error);
-        localStorage.removeItem('supplySyncData');
+        // Don't remove the data, just return false
+        return false;
     }
-    return false;
 }
