@@ -9,7 +9,7 @@ import { initializeImportExportEventListeners } from './services/importExportSer
 // Step 1: Add these new imports
 import { onAuthStateChanged } from './services/authService.js';
 import { auth } from './firebase-config.js';
-import { showAuthScreen, showMainApp, hideAuthScreen } from './authUI.js';
+import { showAuthScreen, showMainApp, } from './authUI.js';
 import './loader.js'; // Import for side effects
 
 // Step 2: Replace the entire initializeApp function with this
