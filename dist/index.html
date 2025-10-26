@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SupplySync</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-boxes-stacked"></i> SupplySync</h1>
+            <div class="company-filter">
+                <i class="fas fa-building"></i>
+                <select id="company-filter-select" title="Select Company"></select>
+                <button id="manage-companies-btn" class="button" title="Manage Companies"><i class="fas fa-cog"></i> Manage</button>
+            </div>
+        </header>
+
+        <main class="main-layout-sidebar">
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <ul>
+                        <li class="nav-item active" data-view="dashboard">
+                            <i class="fas fa-chart-line"></i> Dashboard
+                        </li>
+                        <li class="nav-item" data-view="suppliers">
+                            <i class="fas fa-users"></i> Suppliers
+                        </li>
+                        <li class="nav-item" data-view="products">
+                            <i class="fas fa-box"></i> Inventory
+                        </li>
+                        <li class="nav-item" data-view="order">
+                            <i class="fas fa-shopping-cart"></i> Current Order
+                        </li>
+                        <li class="nav-item" data-view="history">
+                            <i class="fas fa-history"></i> Order History
+                        </li>
+                        <li class="nav-item" data-view="settings">
+                            <i class="fas fa-cog"></i> Settings
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <section class="content-area">
+                <!-- Dashboard View -->
+                <div id="dashboard-view" class="view active">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-chart-line"></i> Dashboard</h2>
+                        <div class="header-actions">
+                            <select id="dashboard-company-filter" class="company-filter-select" title="Select Company"></select>
+                        </div>
+                    </div>
+                    <div class="dashboard-content">
+                        <!-- Summary Cards -->
+                        <div class="summary-cards">
+                            <div class="summary-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div class="card-content">
+                                    <h3>Total Suppliers</h3>
+                                    <p id="total-suppliers">0</p>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-box"></i>
+                                </div>
+                                <div class="card-content">
+                                    <h3>Total Products</h3>
+                                    <p id="total-products">0</p>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-shopping-cart"></i>
+                                </div>
+                                <div class="card-content">
+                                    <h3>Total Orders</h3>
+                                    <p id="total-orders">0</p>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div class="card-content">
+                                    <h3>Total Sales</h3>
+                                    <p id="total-sales">$0.00</p>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-file-invoice-dollar"></i>
+                                </div>
+                                <div class="card-content">
+                                    <h3>Total VAT</h3>
+                                    <p id="total-vat">$0.00</p>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="card-icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <div class="card-content">
+                                    <h3>Pending Payments</h3>
+                                    <p id="pending-payments">0 orders ($0.00)</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Charts Section -->
+                        <div class="charts-section">
+                            <div class="chart-container">
+                                <h3>Orders per Supplier</h3>
+                                <canvas id="orders-per-supplier-chart"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <h3>Products Distribution</h3>
+                                <canvas id="products-distribution-chart"></canvas>
+                            </div>
+                            <div class="chart-container">
+                                <h3>Monthly Sales Trend</h3>
+                                <canvas id="monthly-sales-chart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent Orders -->
+                        <div class="recent-orders-section">
+                            <h3>Recent Orders</h3>
+                            <div id="recent-orders-list" class="list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suppliers View -->
+                <div id="suppliers-view" class="view">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-users"></i> Suppliers</h2>
+                        <button id="add-supplier-btn" title="Add New Supplier" class="add-btn"><i class="fas fa-plus"></i> New Supplier</button>
+                    </div>
+                    <input type="text" id="supplier-search" class="search-bar" placeholder="Search suppliers...">
+                    <div id="supplier-list" class="list"></div>
+                </div>
+
+                <!-- Products View -->
+                <div id="products-view" class="view">
+                    <div class="panel-header">
+                        <h2 id="products-title"><i class="fas fa-box"></i> Inventory</h2>
+                        <div class="header-actions">
+                            <button id="add-product-btn" title="Add New Product" class="add-btn"><i class="fas fa-plus"></i> Add Item</button>
+                        </div>
+                    </div>
+                    <div class="inventory-controls">
+                        <select id="supplier-filter" class="supplier-filter-select" title="Filter inventory by supplier">
+                            <option value="">Show All Items</option>
+                        </select>
+                        <button id="reset-supplier-filter" class="button small" title="Reset to Show All Items"><i class="fas fa-refresh"></i> Reset Filter</button>
+                        <input type="text" id="product-search" class="search-bar" placeholder="Search products...">
+                    </div>
+                    <div id="product-list" class="list"></div>
+                </div>
+
+                <!-- Order View -->
+                <div id="order-view" class="view">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-shopping-cart"></i> Current Order</h2>
+                        <div class="header-actions">
+                            <button id="clear-cart-btn" title="Clear Cart"><i class="fas fa-trash-alt"></i> Clear</button>
+                        </div>
+                    </div>
+                    <div id="cart-list" class="list"></div>
+                    <div class="cart-summary">
+                        <div class="order-details">
+                            <div class="order-detail-field">
+                                <label for="order-number">Order #</label>
+                                <input type="text" id="order-number" placeholder="e.g., PO-1001">
+                            </div>
+                            <div class="order-detail-field">
+                                <label for="order-date">Date</label>
+                                <input type="date" id="order-date">
+                            </div>
+                            <div class="order-detail-field">
+                                <label for="payment-method">Payment</label>
+                                <select id="payment-method">
+                                    <option>Credit Card</option>
+                                    <option>Bank</option>
+                                    <option>Future payment</option>
+                                </select>
+                            </div>
+                            <div class="order-detail-field paid-status">
+                                <label for="paid-status-toggle">Paid</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="paid-status-toggle">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="vat-control">
+                            <label for="vat-toggle">Add 20% VAT</label>
+                            <label class="switch">
+                                <input type="checkbox" id="vat-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div id="price-breakdown"></div>
+                        <div class="cart-actions">
+                            <button id="generate-pdf-btn" class="secondary-button"><i class="fas fa-file-pdf"></i> Generate Invoice</button>
+                            <button id="place-order-btn" class="cta-button"><i class="fas fa-check"></i> Place Order</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order History View -->
+                <div id="history-view" class="view">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-history"></i> Order History</h2>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" id="history-search" class="search-bar" placeholder="Search by Order # or Supplier">
+                        <button id="reset-history-search" class="button small" style="margin-left: 10px; display: none;"><i class="fas fa-times"></i> Reset</button>
+                    </div>
+                    <div id="order-history-list" class="list"></div>
+                </div>
+
+                <!-- Settings View -->
+                <div id="settings-view" class="view">
+                    <div class="panel-header">
+                        <h2><i class="fas fa-cog"></i> Settings</h2>
+                    </div>
+                    <div class="settings-content">
+                        <div class="settings-section">
+                            <h3><i class="fas fa-file-export"></i> Data Backup</h3>
+                            <p>Export or import all application data including companies, suppliers, products, and order history.</p>
+                            <div class="settings-actions">
+                                <button id="export-backup-btn" class="button"><i class="fas fa-file-export"></i> Export Full Backup</button>
+                                <button id="import-backup-btn" class="button"><i class="fas fa-file-import"></i> Import Backup</button>
+                                <input type="file" id="import-backup-file-input" accept=".json" style="display: none;">
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h3><i class="fas fa-sync-alt"></i> Data Import/Export</h3>
+                            <p>Import or export suppliers and products data.</p>
+                            <div class="settings-actions">
+                                <button id="import-data-btn" class="button"><i class="fas fa-file-import"></i> Import Suppliers & Products</button>
+                                <button id="export-data-btn" class="button"><i class="fas fa-file-export"></i> Export Suppliers & Products</button>
+                                <input type="file" id="import-data-file-input" accept=".xlsx, .xls, .csv" style="display: none;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 id="modal-title">Add New Supplier</h3>
+            <form id="modal-form"></form>
+            <div class="modal-actions">
+                <button id="modal-save-btn" class="cta-button"><i class="fas fa-check"></i> Save</button>
+                <button id="modal-cancel-btn"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="company-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3 id="company-modal-title">Manage Company</h3>
+            <form id="company-modal-form">
+                <input type="hidden" id="company-id">
+                <div class="modal-form-field">
+                    <label for="company-name">Company Name</label>
+                    <input type="text" id="company-name" required>
+                </div>
+                <div class="modal-form-field">
+                    <label for="company-address">Address</label>
+                    <textarea id="company-address" rows="2"></textarea>
+                </div>
+                <div class="modal-form-field">
+                    <label for="company-email">Email</label>
+                    <input type="email" id="company-email">
+                </div>
+                <div class="modal-form-field">
+                    <label for="company-phone">Phone</label>
+                    <input type="tel" id="company-phone">
+                </div>
+                <div class="modal-form-field">
+                    <label for="company-website">Website</label>
+                    <input type="url" id="company-website">
+                </div>
+            </form>
+            <div class="modal-actions">
+                <button id="company-delete-btn" class="button" style="background-color: var(--red-color); margin-right: auto;"><i class="fas fa-trash"></i> Delete</button>
+                <button id="company-save-btn" class="cta-button"><i class="fas fa-check"></i> Save</button>
+                <button id="company-cancel-btn"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="company-list-modal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <h3>Manage Companies</h3>
+            <div id="company-management-list" class="list" style="max-height: 50vh;">
+                </div>
+            <div class="modal-actions">
+                <button id="company-list-close-btn"><i class="fas fa-times"></i> Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-alert" class="modal-backdrop hidden">
+        <div class="modal-content alert-modal">
+            <h3 id="custom-alert-title">Confirmation</h3>
+            <p id="custom-alert-message">Are you sure?</p>
+            <div class="modal-actions">
+                <button id="alert-confirm-btn" class="cta-button">Confirm</button>
+                <button id="alert-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="verification-modal" class="modal-backdrop hidden">
+        <div class="modal-content verification-modal-content">
+            <h3 id="verification-modal-title">Confirm Import Changes</h3>
+            <div id="verification-modal-body" class="verification-modal-body">
+                </div>
+            <div class="modal-actions verification-modal-actions">
+                <div>
+                    <button id="verification-select-all" class="secondary-button"><i class="fas fa-check-double"></i> Select All</button>
+                    <button id="verification-deselect-all" class="secondary-button"><i class="fas fa-square"></i> Deselect All</button>
+                </div>
+                <div>
+                    <button id="verification-cancel-btn" class="secondary-button"><i class="fas fa-times"></i> Cancel</button>
+                    <button id="verification-confirm-btn" class="cta-button"><i class="fas fa-check"></i> Confirm Selected Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loader-backdrop" class="modal-backdrop hidden">
+        <div class="loader"></div>
+    </div>
+
+    <!-- Floating Basket Window -->
+    <div id="floating-basket" class="floating-basket hidden">
+        <div class="basket-header">
+            <h3><i class="fas fa-shopping-basket"></i> Current Basket</h3>
+            <button id="close-basket-btn" class="close-btn" title="Close Basket"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="basket-items" class="basket-items"></div>
+        <div class="basket-summary">
+            <div id="basket-total" class="basket-total"></div>
+            <div class="basket-actions">
+                <button id="reset-basket-btn" class="secondary-button"><i class="fas fa-trash-alt"></i> Reset Basket</button>
+                <button id="go-to-order-btn" class="cta-button"><i class="fas fa-shopping-cart"></i> Go to Order</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
