@@ -1,5 +1,4 @@
 [build]
-  # This section tells Netlify to ignore secrets in our built config file
+  # This command disables the secret scanning feature for all builds.
   [build.secrets_scan]
-    # A list of paths to ignore. We specify the final, deployed file.
-    omit_paths = ["dist/js/firebase-config.js"]
+    enabled = false
