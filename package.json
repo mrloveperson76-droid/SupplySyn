@@ -1,0 +1,14 @@
+{
+  "name": "supplysync",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "node ./build.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "replace-in-file": "^7.0.0"
+  }
+}

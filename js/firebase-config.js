@@ -7,9 +7,15 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.1/firebase
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
-// This configuration will now be populated by the script
-// injected by Netlify into the window object.
-const firebaseConfig = window.firebaseConfig;
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "__FIREBASE_API_KEY__",
+  authDomain: "__FIREBASE_AUTH_DOMAIN__",
+  projectId: "__FIREBASE_PROJECT_ID__",
+  storageBucket: "__FIREBASE_STORAGE_BUCKET__",
+  messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+  appId: "__FIREBASE_APP_ID__",
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
