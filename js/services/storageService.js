@@ -1,11 +1,62 @@
 // js/services/storageService.js
 import { state } from '../state.js';
 import { getCurrentUser } from '../services/authService.js';
+import { db } from '../firebase-config.js';
+import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
 // Get the storage key for the current user
 function getUserStorageKey() {
     const user = getCurrentUser();
     return user ? `supplySyncData_${user.id}` : 'supplySyncData';
+}
+
+export async function saveStateToFirestore(currentState) {
+    const user = getCurrentUser();
+    if (!user) return; // Can't save if no user is logged in
+
+    // Create a reference to the user's document using their unique ID
+    const userDocRef = doc(db, 'userData', user.id);
+
+    try {
+        // Use setDoc to save the entire state object. This will overwrite any existing data.
+        await setDoc(userDocRef, {
+            companies: currentState.companies,
+            selectedCompanyId: currentState.selectedCompanyId,
+            suppliers: currentState.suppliers,
+            products: currentState.products,
+            // We don't need to save the cart or volatile details
+            orderHistory: currentState.orderHistory,
+        });
+    } catch (error) {
+        console.error("Error saving data to Firestore:", error);
+        alert("Error: Could not save your data. Please check your internet connection.");
+    }
+}
+
+export async function loadStateFromFirestore() {
+    const user = getCurrentUser();
+    if (!user) return false;
+
+    const userDocRef = doc(db, 'userData', user.id);
+
+    try {
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+            const loadedData = docSnap.data();
+            // Carefully merge loaded data into the existing state object
+            Object.assign(state, loadedData);
+            console.log("User data loaded from Firestore.");
+            return true;
+        } else {
+            // No data exists for this user, they are likely new.
+            // The app will just use its default initial state.
+            console.log("No data found for this user, initializing with defaults.");
+            return false;
+        }
+    } catch (error) {
+        console.error("Error loading data from Firestore:", error);
+        return false;
+    }
 }
 
 export function saveStateToLocalStorage(currentState) {

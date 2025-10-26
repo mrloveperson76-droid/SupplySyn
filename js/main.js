@@ -1,37 +1,46 @@
 // js/main.js
+
 import { state } from './state.js';
 import { renderAll } from './ui.js';
 import { initializeEventListeners } from './listeners.js';
-import { loadStateFromLocalStorage } from './services/storageService.js';
+import { loadStateFromFirestore } from './services/storageService.js'; // Ensure this is here
 import { generatePdf } from './services/pdfService.js';
 import { initializeImportExportEventListeners } from './services/importExportService.js';
-import { isAuthenticated, getCurrentUser, logoutUser } from './services/authService.js';
+// Step 1: Add these new imports
+import { onAuthStateChanged } from './services/authService.js';
+import { auth } from './firebase-config.js';
 import { showAuthScreen, showMainApp, hideAuthScreen } from './authUI.js';
 import './loader.js'; // Import for side effects
 
+// Step 2: Replace the entire initializeApp function with this
 function initializeApp() {
-    console.log("1. App Initializing...");
-    try {
-        // Check if user is authenticated
-        const authStatus = isAuthenticated();
-        console.log("Authentication status:", authStatus);
-        if (authStatus) {
-            // User is logged in, show main app
-            console.log("User is authenticated, showing main app");
+    console.log("1. App Initializing and setting up auth listener...");
+    
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            // User is signed in!
+            console.log("Auth state changed: User is signed in.", user);
+            
+            // Load their data from the database
+            await loadStateFromFirestore();
+            
+            // Show the main application UI
             showMainApp();
+            
+            // Initialize all the event listeners for the main app
             initializeEventListeners();
             initializeImportExportEventListeners(state);
             document.getElementById('generate-pdf-btn').addEventListener('click', () => generatePdf(state));
-            console.log("✅ App Initialized Successfully.");
+            
+            console.log("✅ App Initialized Successfully for logged-in user.");
         } else {
-            // User is not logged in, show auth screen
-            console.log("User is not authenticated, showing auth screen");
+            // User is signed out
+            console.log("Auth state changed: User is signed out.");
+            
+            // Show the login/register screen
             showAuthScreen();
         }
-    } catch (error) {
-        console.error("❌ App Initialization Failed:", error);
-        alert("An error occurred during app initialization. Please check the console for details.");
-    }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', initializeApp);

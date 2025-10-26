@@ -1,7 +1,7 @@
 // js/authUI.js
 
 import { registerUser, loginUser, setCurrentUser, isAuthenticated, getCurrentUser } from './services/authService.js';
-import { loadStateFromLocalStorage } from './services/storageService.js';
+import { loadStateFromLocalStorage, loadStateFromFirestore } from './services/storageService.js';
 import { renderAll } from './ui.js';
 
 // Show authentication screen (login or register)
@@ -84,6 +84,21 @@ function showLoginForm() {
     
     // Add event listener for login form
     document.getElementById('login-form').addEventListener('submit', handleLogin);
+    
+    // Add event listener for forgot password link
+    const forgotPasswordLink = document.getElementById('forgot-password-link');
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            const email = prompt("Please enter your email address to receive a password reset link:");
+            if (email) {
+                // We need to import the function to use it
+                import('./services/authService.js').then(authService => {
+                    authService.sendPasswordReset(email);
+                });
+            }
+        });
+    }
 }
 
 // Show register form
@@ -131,12 +146,20 @@ async function handleLogin(e) {
     
     try {
         errorElement.textContent = '';
-        const user = loginUser(email, password);
-        setCurrentUser(user);
+        // Await the login to complete
+        const user = await loginUser(email, password);
         
-        // Hide auth screen and show main app
-        hideAuthScreen();
-        showMainApp();
+        if (user) {
+            // Await loading data before showing the app
+            await loadStateFromFirestore(); 
+            
+            // The original setCurrentUser is no longer needed here as Firebase handles the session.
+            // We can remove it for clarity.
+            
+            // Now show the app with the loaded data
+            hideAuthScreen();
+            showMainApp();
+        }
     } catch (error) {
         errorElement.textContent = error.message;
     }
@@ -160,8 +183,8 @@ async function handleRegister(e) {
             throw new Error('Passwords do not match');
         }
         
-        // Register user
-        const user = registerUser(fullName, email, password);
+        // Register user with Firebase
+        await registerUser(fullName, email, password);
         
         // Show success message and switch to login tab
         alert('Registration successful! Please login with your credentials.');
@@ -190,7 +213,7 @@ export function hideAuthScreen() {
 // Show main application
 export function showMainApp() {
     // Load user data
-    loadStateFromLocalStorage();
+    loadStateFromFirestore();
     
     // Render all components
     renderAll();
@@ -271,7 +294,7 @@ function updateUserInfo() {
         }
         
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => {
+            logoutBtn.addEventListener('click', async () => {
                 userDropdown.classList.remove('show');
                 // Import logoutUser here to avoid circular dependency
                 import('./services/authService.js').then(authService => {

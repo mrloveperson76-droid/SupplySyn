@@ -3,7 +3,7 @@ import { generatePdf, generatePdfFromHistory } from './services/pdfService.js';
 import * as State from './state.js';
 import { renderAll, renderFloatingBasket, toggleOrderDetails } from './ui.js';
 import { openModal, closeModal, showCustomConfirm, openCompanyModal, closeCompanyModal, openCompanyListModal, closeCompanyListModal } from './modal.js';
-import { saveStateToLocalStorage } from './services/storageService.js';
+import { saveStateToFirestore } from './services/storageService.js';
 import { handleFileImport, handleDataExport } from './services/importExportService.js';
 import { getCurrentUser, updateUserProfile, changeUserPassword } from './services/authService.js';
 
@@ -22,7 +22,7 @@ export function updateDashboard() {
 function renderAndSave() {
     try {
         renderAll();
-        saveStateToLocalStorage(State.state);
+        saveStateToFirestore(State.state);
         // Update dashboard if it's active
         updateDashboard();
     } catch (error) {

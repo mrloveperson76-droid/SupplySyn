@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { applyImportChanges } from './state.js';
 import { renderAll, renderCompanyManagementList } from './ui.js';
-import { saveStateToLocalStorage } from './services/storageService.js';
+import { saveStateToFirestore } from './services/storageService.js';
 
 const modal = document.getElementById('modal');
 const modalTitle = document.getElementById('modal-title');
@@ -384,7 +384,7 @@ document.getElementById('verification-confirm-btn').addEventListener('click', ()
     };
     
     applyImportChanges(verifiedChanges);
-    saveStateToLocalStorage(state);
+    saveStateToFirestore(state);
     renderAll();
     verificationModal.classList.add('hidden');
     clearVerificationModal(); 

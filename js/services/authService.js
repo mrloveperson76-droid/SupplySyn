@@ -4,6 +4,17 @@
  * Authentication service for user login and registration using localStorage
  */
 
+// Import Firebase modules
+import { auth } from '../firebase-config.js';
+import {
+    createUserWithEmailAndPassword,
+    updateProfile,
+    signInWithEmailAndPassword,
+    signOut,
+    sendPasswordResetEmail,
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
 // Get all users from localStorage
 export function getAllUsers() {
     try {
@@ -28,13 +39,17 @@ export function saveUsers(users) {
 
 // Get current user session
 export function getCurrentUser() {
-    try {
-        const activeUser = localStorage.getItem('supplySyncActiveUser');
-        return activeUser ? JSON.parse(activeUser) : null;
-    } catch (error) {
-        console.error('Error reading active user from localStorage:', error);
-        return null;
-    }
+    // We'll get user info from Firebase's current user object
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return null;
+
+    // Adapt the Firebase user object to the structure our app expects
+    return {
+        id: firebaseUser.uid,
+        fullName: firebaseUser.displayName,
+        email: firebaseUser.email,
+        // Add other fields as needed
+    };
 }
 
 // Set current user session
@@ -53,75 +68,51 @@ export function setCurrentUser(user) {
 }
 
 // Register a new user
-export function registerUser(fullName, email, password) {
-    // Validate input
+export async function registerUser(fullName, email, password) {
     if (!fullName || !email || !password) {
         throw new Error('All fields are required');
     }
-    
-    if (!isValidEmail(email)) {
-        throw new Error('Please enter a valid email address');
-    }
-    
     if (password.length < 6) {
         throw new Error('Password must be at least 6 characters long');
     }
-    
-    const users = getAllUsers();
-    
-    // Check if user already exists
-    if (users[email]) {
-        throw new Error('User with this email already exists');
-    }
-    
-    // Create new user
-    const newUser = {
-        id: Date.now().toString(),
-        fullName: fullName,
-        email: email,
-        password: password, // In a real app, this should be hashed
-        createdAt: new Date().toISOString()
-    };
-    
-    users[email] = newUser;
-    
-    if (saveUsers(users)) {
-        return newUser;
-    } else {
-        throw new Error('Failed to save user data');
+
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Add the user's full name to their Firebase profile
+        await updateProfile(userCredential.user, {
+            displayName: fullName
+        });
+        return userCredential.user;
+    } catch (error) {
+        // Firebase provides user-friendly error messages!
+        console.error("Firebase registration error:", error.message);
+        throw new Error(error.message); // Throw the error so the UI can catch it
     }
 }
 
 // Login user
-export function loginUser(email, password) {
-    // Validate input
+export async function loginUser(email, password) {
     if (!email || !password) {
         throw new Error('Email and password are required');
     }
-    
-    const users = getAllUsers();
-    
-    // Check if user exists
-    const user = users[email];
-    if (!user) {
-        throw new Error('No user found with this email');
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        return userCredential.user;
+    } catch (error) {
+        console.error("Firebase login error:", error.message);
+        throw new Error(error.message);
     }
-    
-    // Check password
-    if (user.password !== password) { // In a real app, this should compare hashed passwords
-        throw new Error('Incorrect password');
-    }
-    
-    // Return user without password
-    const { password: _, ...userWithoutPassword } = user;
-    return userWithoutPassword;
 }
 
 // Logout user
-export function logoutUser() {
-    setCurrentUser(null);
-    // Clear any user-specific data
-    localStorage.removeItem('supplySyncData');
+export async function logoutUser() {
+    try {
+        await signOut(auth);
+        // Clear any local state if needed
+        localStorage.removeItem('supplySyncActiveUser');
+    } catch (error) {
+        console.error("Firebase logout error:", error);
+    }
 }
 
 // Validate email format
@@ -132,7 +123,7 @@ export function isValidEmail(email) {
 
 // Check if user is authenticated
 export function isAuthenticated() {
-    return !!getCurrentUser();
+    return !!auth.currentUser;
 }
 
 // Get user data (companies, suppliers, etc.) from localStorage
@@ -237,3 +228,15 @@ export function changeUserPassword(userId, currentPassword, newPassword) {
         throw error;
     }
 }
+
+export async function sendPasswordReset(email) {
+    try {
+        await sendPasswordResetEmail(auth, email);
+        alert('Password reset email sent! Please check your inbox.');
+    } catch (error) {
+        console.error(error);
+        alert(error.message);
+    }
+}
+
+export { onAuthStateChanged };
